@@ -89,7 +89,7 @@ namespace EscapeSequenceAnalyzer
         FG_MAGENTA = 35,
         FG_CYAN = 36,
         FG_WHITE = 37,
-        FG_8BIT = 38,
+        FG_ADVANCED = 38,
         FG_DEFAULT = 39,
 
         BG_BLACK = 40,
@@ -100,7 +100,7 @@ namespace EscapeSequenceAnalyzer
         BG_MAGENTA = 45,
         BG_CYAN = 46,
         BG_WHITE = 47,
-        BG_8BIT = 48,
+        BG_ADVANCED = 48,
         BG_DEFAULT = 49,
 
         DISABLE_PROPORTIONAL_SPACING = 50,
@@ -147,5 +147,19 @@ namespace EscapeSequenceAnalyzer
         FROM_CURSOR_TO_END_OF_LINE = 0,
         FROM_CURSOR_TO_BEGINNING_OF_LINE = 1,
         ALL_LINE = 2,
+	}
+
+    enum PRIVATE_SEQUENCE_CODE
+	{
+        CURSOR = 25,
+        ALTERNATIVE_SCREEN_BUFFER = 1049,
+        BRACKETED_PASTE_MODE = 2004,
+	}
+
+    enum CSI_SGR_COLOR_MODE
+	{
+        NONE = -1,
+        RGB24 = 2,
+        PAL8 = 5,
 	}
 }

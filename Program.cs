@@ -1,25 +1,28 @@
 ﻿using System;
+using System.IO;
 using System.Threading;
 
 namespace EscapeSequenceAnalyzer
 {
     class Program
     {
+        static Stream StandardInput;
         static bool DecodingEscapeSequence = false;
         
         static ESCAPE_TYPE EscapeType = ESCAPE_TYPE.NONE;
         static OSC_CTRL CurrentOscCtrl = OSC_CTRL.NONE;
 
+        static string[] EscapeSequenceArguments = new string[16];
+
         static void Main(string[] args)
         {
-            var stdin = Console.OpenStandardInput();
-            string[] escargs = new string[8];
+            StandardInput = Console.OpenStandardInput();
 
             int pos = 0, charcount = 0, argsindex = 0, retries = 0;
 
             while (retries < 5)
             {
-                int b = stdin.ReadByte();
+                int b = StandardInput.ReadByte();
                 if (b == -1) { Thread.Sleep(200); retries++; continue; }
 
                 if (!DecodingEscapeSequence) // Text mode
@@ -58,7 +61,7 @@ namespace EscapeSequenceAnalyzer
                         }
                         else
                         {
-                            escargs[argsindex] += (char)b;
+                            EscapeSequenceArguments[argsindex] += (char)b;
                             Console.WriteLine($"0x{pos:X4}  {b:X2} '{(char)b}'.");
                         }
                     }
@@ -70,7 +73,7 @@ namespace EscapeSequenceAnalyzer
                     {
                         if (b >= 0x30 & b <= 0x39) // 0-9
                         {
-                            escargs[argsindex] += (char)b;
+                            EscapeSequenceArguments[argsindex] += (char)b;
                             Console.WriteLine($"0x{pos:X4}  {b:X2} NUMBER_{(char)b}.");
                         }
                         else if (b == 0x3a) // ':'
@@ -85,7 +88,7 @@ namespace EscapeSequenceAnalyzer
                         }
                         else if (b == 0x3f) // '?'
                         {
-                            escargs[argsindex] += (char)b;
+                            EscapeSequenceArguments[argsindex] += (char)b;
                             Console.WriteLine($"0x{pos:X4}  3F PRIVATE_CONTROL_SEQUENCE.");
                         }
                         else if (Enum.IsDefined(typeof(CSI_CTRL), b))
@@ -94,40 +97,52 @@ namespace EscapeSequenceAnalyzer
                             switch ((CSI_CTRL)b)
                             { 
                                 case CSI_CTRL.SELECT_GRAPHIC_RENDITION:
-                                    foreach (string s in escargs)
+                                    CSI_SGR_COLOR_MODE ColorMode = CSI_SGR_COLOR_MODE.NONE;
+
+                                    if (EscapeSequenceArguments[0] == "38" || EscapeSequenceArguments[0] == "48")
+									{
+                                        ColorMode = (CSI_SGR_COLOR_MODE)Convert.ToInt32(EscapeSequenceArguments[1]);
+                                        Console.WriteLine($"           {(EscapeSequenceArguments[0] == "38" ? "FORE" : "BACK")}GROUND_COLOR.");
+                                    }
+
+                                    switch (ColorMode)
                                     {
-                                        if (s != null && s != "")
-                                            Console.WriteLine($"           '{s}' = {(CSI_SELECT_GRAPHIC_RENDITION_CODE)Convert.ToInt32(s)}.");
+                                        case CSI_SGR_COLOR_MODE.NONE:
+                                            foreach (string s in EscapeSequenceArguments)
+                                            {
+                                                if (s != null && s != "")
+                                                    Console.WriteLine($"           '{s}' = {(CSI_SELECT_GRAPHIC_RENDITION_CODE)Convert.ToInt32(s)}.");
+                                            }
+                                            break;
+                                        case CSI_SGR_COLOR_MODE.PAL8:
+                                            Console.WriteLine($"           PALETTED_COLOR_{EscapeSequenceArguments[2]}.");
+                                            break;
+                                        case CSI_SGR_COLOR_MODE.RGB24:
+                                            Console.WriteLine($"           R={EscapeSequenceArguments[2]} G={EscapeSequenceArguments[3]} B={EscapeSequenceArguments[4]}.");
+                                            break;
                                     }
                                     break;
 
                                 case CSI_CTRL.ERASE_IN_DISPLAY:
-                                    Console.WriteLine($"           {(CSI_ERASE_IN_DISPLAY_CODE)Convert.ToInt32(escargs[0])}.");
+                                    Console.WriteLine($"           {(CSI_ERASE_IN_DISPLAY_CODE)Convert.ToInt32(EscapeSequenceArguments[0])}.");
                                     break;
 
                                 case CSI_CTRL.ERASE_IN_LINE:
-                                    Console.WriteLine($"           {(CSI_ERASE_IN_LINE_CODE)Convert.ToInt32(escargs[0])}.");
+                                    Console.WriteLine($"           {(CSI_ERASE_IN_LINE_CODE)Convert.ToInt32(EscapeSequenceArguments[0])}.");
                                     break;
 
                                 case CSI_CTRL.CURSOR_POSITION:
-                                    Console.WriteLine($"           ROW {escargs[0] ?? "1"}, COLUMN {escargs[1] ?? "1"}.");
+                                    Console.WriteLine($"           ROW {EscapeSequenceArguments[0] ?? "1"}, COLUMN {EscapeSequenceArguments[1] ?? "1"}.");
                                     break;
 
                                 case CSI_CTRL.SCROLL_UP:
                                 case CSI_CTRL.SCROLL_DOWN:
-                                    Console.WriteLine($"           {escargs[0] ?? "1"} LINES.");
+                                    Console.WriteLine($"           {EscapeSequenceArguments[0] ?? "1"} LINES.");
                                     break;
 
                                 case CSI_CTRL.ENABLE:
                                 case CSI_CTRL.DISABLE:
-                                    if (escargs[0] == "?25")
-                                    {
-                                        Console.WriteLine($"           CURSOR.");
-                                    }
-                                    else if (escargs[0] == "?1049")
-									{
-                                        Console.WriteLine($"           ALTERNATIVE_SCREEN_BUFFER.");
-                                    }
+                                    Console.WriteLine($"           {(PRIVATE_SEQUENCE_CODE)Convert.ToInt32(EscapeSequenceArguments[0][1..])}");
                                     break;
                             }
                         }
@@ -151,7 +166,7 @@ namespace EscapeSequenceAnalyzer
                         Console.WriteLine($"           ESC_END.");
                         DecodingEscapeSequence = false;
                         EscapeType = ESCAPE_TYPE.NONE;
-                        escargs = new string[8];
+                        EscapeSequenceArguments = new string[16];
                         argsindex = 0;
                     }
                 }
